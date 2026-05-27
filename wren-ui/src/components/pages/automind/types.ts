@@ -8,6 +8,16 @@ export interface AutoMindChartSpec {
   y?: string;
 }
 
+export interface AutoMindAgentInsights {
+  enabled?: boolean;
+  provider?: string;
+  model?: string;
+  summary?: string;
+  business_insights?: string[];
+  recommendations?: string[];
+  risk_notes?: string[];
+}
+
 export interface AutoMindReport {
   title?: string;
   executive_summary?: string[];
@@ -46,6 +56,7 @@ export interface AutoMindReport {
   recommendations?: string[];
   warnings?: string[];
   limitations?: string[];
+  agent_insights?: AutoMindAgentInsights;
   report_markdown?: string;
 }
 

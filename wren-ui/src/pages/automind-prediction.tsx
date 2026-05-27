@@ -155,7 +155,10 @@ export default function AutoMindPredictionPage() {
               </Col>
               {sourceInfo && (
                 <Col xs={24} lg={8}>
-                  <SourceIndicator sourceInfo={sourceInfo} />
+                  <SourceIndicator
+                    sourceInfo={sourceInfo}
+                    agentInsights={report?.agent_insights}
+                  />
                 </Col>
               )}
             </Row>
@@ -187,6 +190,10 @@ export default function AutoMindPredictionPage() {
 
             <Section title="Key Data Insights">
               <BulletList items={report.key_insights} />
+            </Section>
+
+            <Section title="Agent Insights">
+              <AgentInsights insights={report.agent_insights} />
             </Section>
 
             <Section title="Prediction Task">
@@ -284,8 +291,15 @@ function ActionBlock({
   );
 }
 
-function SourceIndicator({ sourceInfo }: { sourceInfo: SourceInfo }) {
+function SourceIndicator({
+  sourceInfo,
+  agentInsights,
+}: {
+  sourceInfo: SourceInfo;
+  agentInsights?: AutoMindReport['agent_insights'];
+}) {
   const isWren = sourceInfo.source === 'wren';
+  const hasAgentInsights = Boolean(agentInsights);
 
   return (
     <Card title="Current Mode / Source" size="small">
@@ -293,6 +307,9 @@ function SourceIndicator({ sourceInfo }: { sourceInfo: SourceInfo }) {
         <Tag color={isWren ? 'geekblue' : 'default'}>
           Source:{' '}
           {isWren ? 'WrenAI E-commerce sample' : 'Built-in AutoMind demo data'}
+        </Tag>
+        <Tag color={hasAgentInsights ? 'green' : 'default'}>
+          InsightAgent: {hasAgentInsights ? 'LLM enriched' : 'Rule-based'}
         </Tag>
         {isWren && (
           <Text>
@@ -304,6 +321,66 @@ function SourceIndicator({ sourceInfo }: { sourceInfo: SourceInfo }) {
         )}
       </Space>
     </Card>
+  );
+}
+
+function AgentInsights({
+  insights,
+}: {
+  insights?: AutoMindReport['agent_insights'];
+}) {
+  if (!insights) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        message="InsightAgent: Rule-based report only"
+      />
+    );
+  }
+
+  return (
+    <Space direction="vertical" size={16} className="w-100">
+      <Space wrap>
+        <Tag color="green">LLM enriched</Tag>
+        {insights.provider && <Tag>Provider: {insights.provider}</Tag>}
+        {insights.model && <Tag>Model: {insights.model}</Tag>}
+      </Space>
+
+      {insights.summary && (
+        <div>
+          <Text strong>Summary</Text>
+          <Paragraph className="mb-0">{insights.summary}</Paragraph>
+        </div>
+      )}
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={8}>
+          <InsightList
+            title="Business Insights"
+            items={insights.business_insights}
+          />
+        </Col>
+        <Col xs={24} lg={8}>
+          <InsightList
+            title="Agent Recommendations"
+            items={insights.recommendations}
+          />
+        </Col>
+        <Col xs={24} lg={8}>
+          <InsightList title="Risk Notes" items={insights.risk_notes} />
+        </Col>
+      </Row>
+    </Space>
+  );
+}
+
+function InsightList({ title, items }: { title: string; items?: string[] }) {
+  return (
+    <div>
+      <Text strong>{title}</Text>
+      <BulletList items={items} />
+    </div>
   );
 }
 

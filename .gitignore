@@ -84,6 +84,7 @@ yarn-error.log*
 .env*.local
 .env*
 .env.ai
+.env
 
 ## vercel
 .vercel
