@@ -100,5 +100,6 @@ wren-launcher/main
 ## temporary files
 .tmp
 venv/
+data/
 
 !wren-ai-service/tools/.env.example

@@ -28,7 +28,8 @@ const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 const { Panel } = Collapse;
 
-type PredictionSource = 'demo' | 'wren';
+type PredictionDomain = 'ecommerce' | 'heart';
+type PredictionSource = 'demo' | 'wren' | 'heart';
 
 interface SourceInfo {
   source: PredictionSource;
@@ -36,8 +37,10 @@ interface SourceInfo {
 }
 
 export default function AutoMindPredictionPage() {
+  const [selectedDomain, setSelectedDomain] =
+    useState<PredictionDomain>('ecommerce');
   const [loadingAction, setLoadingAction] =
-    useState<'demo' | 'wren' | null>(null);
+    useState<PredictionSource | null>(null);
   const [error, setError] = useState<string>(null);
   const [response, setResponse] = useState<AutoMindResponse>(null);
   const [sourceInfo, setSourceInfo] = useState<SourceInfo | null>(null);
@@ -47,6 +50,13 @@ export default function AutoMindPredictionPage() {
   const warnings = report?.warnings || response?.warnings || [];
   const limitations = report?.limitations || [];
 
+  const selectDomain = (domain: PredictionDomain) => {
+    setSelectedDomain(domain);
+    setError(null);
+    setResponse(null);
+    setSourceInfo(null);
+  };
+
   const runPrediction = async (source: PredictionSource) => {
     setLoadingAction(source);
     setError(null);
@@ -54,16 +64,23 @@ export default function AutoMindPredictionPage() {
       const endpoint =
         source === 'wren'
           ? '/api/automind/predict-from-wren'
-          : '/api/automind/predict';
+          : source === 'heart'
+            ? '/api/automind/predict-heart-disease'
+            : '/api/automind/predict';
       const result = await axios.post<AutoMindResponse>(endpoint, {});
-      const recordCount = (
-        result.data as AutoMindResponse & { record_count?: number }
-      ).record_count;
+      const metadata = result.data as AutoMindResponse & {
+        heart_disease_dataset?: { train_rows?: number };
+        record_count?: number;
+      };
+      const recordCount =
+        source === 'wren'
+          ? metadata.record_count
+          : source === 'heart'
+            ? metadata.heart_disease_dataset?.train_rows ||
+              metadata.summary?.rows
+            : undefined;
       setResponse(result.data);
-      setSourceInfo({
-        source,
-        recordCount: source === 'wren' ? recordCount : undefined,
-      });
+      setSourceInfo({ source, recordCount });
     } catch (err) {
       const detail = axios.isAxiosError(err)
         ? err.response?.data?.detail ||
@@ -74,11 +91,13 @@ export default function AutoMindPredictionPage() {
           : 'Unknown request error';
       const message =
         typeof detail === 'string' ? detail : JSON.stringify(detail);
-      setError(
+      const label =
         source === 'wren'
-          ? `WrenAI data prediction failed: ${message}`
-          : `Demo prediction failed: ${message}`,
-      );
+          ? 'WrenAI data prediction'
+          : source === 'heart'
+            ? 'Heart Disease prediction'
+            : 'Demo prediction';
+      setError(`${label} failed: ${message}`);
     } finally {
       setLoadingAction(null);
     }
@@ -98,54 +117,95 @@ export default function AutoMindPredictionPage() {
                       AutoMind Prediction
                     </Title>
                     <Paragraph className="mb-0" type="secondary">
-                      Real-data prediction report generated from WrenAI
-                      E-commerce sample data.
+                      {selectedDomain === 'heart'
+                        ? 'Prepared Heart Disease classification report from AutoMind-service.'
+                        : 'Real-data prediction report generated from WrenAI E-commerce sample data.'}
                     </Paragraph>
                     <Space wrap>
                       <Tag color="blue">AutoMind-service: localhost:8000</Tag>
-                      <Tag color="geekblue">WrenAI E-commerce sample</Tag>
+                      <Tag color="geekblue">
+                        {selectedDomain === 'heart'
+                          ? 'Prepared Heart Disease CSV dataset'
+                          : 'WrenAI E-commerce sample'}
+                      </Tag>
                     </Space>
+                    <DomainSelector
+                      selectedDomain={selectedDomain}
+                      onSelect={selectDomain}
+                      disabled={Boolean(loadingAction)}
+                    />
                   </Space>
                 </Col>
                 <Col xs={24} lg={10}>
                   <Space direction="vertical" size={12} className="w-100">
-                    <ActionBlock
-                      title="Run Prediction from WrenAI Data"
-                      helper="Use real row-level records queried from WrenAI."
-                    >
-                      <Button
-                        type="primary"
-                        block
-                        loading={loadingAction === 'wren'}
-                        disabled={Boolean(loadingAction)}
-                        onClick={() => runPrediction('wren')}
+                    {selectedDomain === 'ecommerce' ? (
+                      <>
+                        <ActionBlock
+                          title="Run Prediction from WrenAI Data"
+                          helper="Use real row-level records queried from WrenAI."
+                        >
+                          <Button
+                            type="primary"
+                            block
+                            loading={loadingAction === 'wren'}
+                            disabled={Boolean(loadingAction)}
+                            onClick={() => runPrediction('wren')}
+                          >
+                            Run Prediction from WrenAI Data
+                          </Button>
+                        </ActionBlock>
+                        <ActionBlock
+                          title="Run Demo Prediction"
+                          helper="Use built-in demo records as a fallback."
+                        >
+                          <Button
+                            block
+                            loading={loadingAction === 'demo'}
+                            disabled={Boolean(loadingAction)}
+                            onClick={() => runPrediction('demo')}
+                          >
+                            Run Demo Prediction
+                          </Button>
+                        </ActionBlock>
+                      </>
+                    ) : (
+                      <ActionBlock
+                        title="Run Heart Disease Demo"
+                        helper="Use the prepared labeled Heart Disease CSV dataset."
                       >
-                        Run Prediction from WrenAI Data
-                      </Button>
-                    </ActionBlock>
-                    <ActionBlock
-                      title="Run Demo Prediction"
-                      helper="Use built-in demo records as a fallback."
-                    >
-                      <Button
-                        block
-                        loading={loadingAction === 'demo'}
-                        disabled={Boolean(loadingAction)}
-                        onClick={() => runPrediction('demo')}
-                      >
-                        Run Demo Prediction
-                      </Button>
-                    </ActionBlock>
+                        <Button
+                          type="primary"
+                          block
+                          loading={loadingAction === 'heart'}
+                          disabled={Boolean(loadingAction)}
+                          onClick={() => runPrediction('heart')}
+                        >
+                          Run Heart Disease Demo
+                        </Button>
+                      </ActionBlock>
+                    )}
                   </Space>
                 </Col>
               </Row>
             </Card>
 
+            {selectedDomain === 'heart' && (
+              <Alert
+                type="warning"
+                showIcon
+                message="This workflow is for demonstration and research only. It is not medical advice, diagnosis, or treatment guidance."
+              />
+            )}
+
             <Row gutter={[16, 16]}>
               <Col xs={24} lg={sourceInfo ? 16 : 24}>
                 <Card title="Data Flow" size="small">
                   <Space wrap size={8}>
-                    <Tag color="processing">WrenAI SQL Query</Tag>
+                    <Tag color="processing">
+                      {selectedDomain === 'heart'
+                        ? 'Prepared CSV Dataset'
+                        : 'WrenAI SQL Query'}
+                    </Tag>
                     <Text type="secondary">→</Text>
                     <Tag color="blue">AutoMind-service</Tag>
                     <Text type="secondary">→</Text>
@@ -260,6 +320,38 @@ function Section(props: { title: string; children: React.ReactNode }) {
   );
 }
 
+function DomainSelector({
+  selectedDomain,
+  onSelect,
+  disabled,
+}: {
+  selectedDomain: PredictionDomain;
+  onSelect: (domain: PredictionDomain) => void;
+  disabled: boolean;
+}) {
+  return (
+    <Space direction="vertical" size={6} className="w-100">
+      <Text strong>Domain</Text>
+      <Space wrap>
+        <Button
+          type={selectedDomain === 'ecommerce' ? 'primary' : 'default'}
+          disabled={disabled}
+          onClick={() => onSelect('ecommerce')}
+        >
+          E-commerce Good Review
+        </Button>
+        <Button
+          type={selectedDomain === 'heart' ? 'primary' : 'default'}
+          disabled={disabled}
+          onClick={() => onSelect('heart')}
+        >
+          Heart Disease Classification
+        </Button>
+      </Space>
+    </Space>
+  );
+}
+
 function ActionBlock({
   title,
   helper,
@@ -299,19 +391,24 @@ function SourceIndicator({
   agentInsights?: AutoMindReport['agent_insights'];
 }) {
   const isWren = sourceInfo.source === 'wren';
+  const isHeart = sourceInfo.source === 'heart';
   const hasAgentInsights = Boolean(agentInsights);
+  const sourceLabel = isHeart
+    ? 'Prepared Heart Disease CSV dataset'
+    : isWren
+      ? 'WrenAI E-commerce sample'
+      : 'Built-in AutoMind demo data';
 
   return (
     <Card title="Current Mode / Source" size="small">
       <Space direction="vertical" size={8}>
-        <Tag color={isWren ? 'geekblue' : 'default'}>
-          Source:{' '}
-          {isWren ? 'WrenAI E-commerce sample' : 'Built-in AutoMind demo data'}
+        <Tag color={isHeart ? 'volcano' : isWren ? 'geekblue' : 'default'}>
+          Source: {sourceLabel}
         </Tag>
         <Tag color={hasAgentInsights ? 'green' : 'default'}>
           InsightAgent: {hasAgentInsights ? 'LLM enriched' : 'Rule-based'}
         </Tag>
-        {isWren && (
+        {(isWren || isHeart) && (
           <Text>
             Records:{' '}
             {typeof sourceInfo.recordCount === 'number'
