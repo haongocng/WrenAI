@@ -28,17 +28,26 @@ const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 const { Panel } = Collapse;
 
+type PredictionSource = 'demo' | 'wren';
+
+interface SourceInfo {
+  source: PredictionSource;
+  recordCount?: number;
+}
+
 export default function AutoMindPredictionPage() {
-  const [loadingAction, setLoadingAction] = useState<'demo' | 'wren' | null>(null);
+  const [loadingAction, setLoadingAction] =
+    useState<'demo' | 'wren' | null>(null);
   const [error, setError] = useState<string>(null);
   const [response, setResponse] = useState<AutoMindResponse>(null);
+  const [sourceInfo, setSourceInfo] = useState<SourceInfo | null>(null);
 
   const report = useMemo(() => normalizeReport(response), [response]);
   const metrics = report?.model_audit?.metrics || response?.metrics || {};
   const warnings = report?.warnings || response?.warnings || [];
   const limitations = report?.limitations || [];
 
-  const runPrediction = async (source: 'demo' | 'wren') => {
+  const runPrediction = async (source: PredictionSource) => {
     setLoadingAction(source);
     setError(null);
     try {
@@ -47,7 +56,14 @@ export default function AutoMindPredictionPage() {
           ? '/api/automind/predict-from-wren'
           : '/api/automind/predict';
       const result = await axios.post<AutoMindResponse>(endpoint, {});
+      const recordCount = (
+        result.data as AutoMindResponse & { record_count?: number }
+      ).record_count;
       setResponse(result.data);
+      setSourceInfo({
+        source,
+        recordCount: source === 'wren' ? recordCount : undefined,
+      });
     } catch (err) {
       const detail = axios.isAxiosError(err)
         ? err.response?.data?.detail ||
@@ -56,7 +72,8 @@ export default function AutoMindPredictionPage() {
         : err instanceof Error
           ? err.message
           : 'Unknown request error';
-      const message = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      const message =
+        typeof detail === 'string' ? detail : JSON.stringify(detail);
       setError(
         source === 'wren'
           ? `WrenAI data prediction failed: ${message}`
@@ -72,40 +89,77 @@ export default function AutoMindPredictionPage() {
       <HeaderBar />
       <Content>
         <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
-          <Card>
-          <Row justify="space-between" align="middle" gutter={[16, 16]}>
-            <Col>
-              <Space direction="vertical" size={4}>
-                <Title level={2} className="mb-0">
-                  AutoMind Prediction
-                </Title>
-                <Paragraph className="mb-0" type="secondary">
-                  E-commerce Good Review Prediction Report
-                </Paragraph>
-                <Tag color="blue">AutoMind-service: localhost:8000</Tag>
-              </Space>
-            </Col>
-            <Col>
-              <Space wrap>
-                <Button
-                  loading={loadingAction === 'demo'}
-                  disabled={Boolean(loadingAction)}
-                  onClick={() => runPrediction('demo')}
-                >
-                  Run Demo Prediction
-                </Button>
-                <Button
-                  type="primary"
-                  loading={loadingAction === 'wren'}
-                  disabled={Boolean(loadingAction)}
-                  onClick={() => runPrediction('wren')}
-                >
-                  Run Prediction from WrenAI Data
-                </Button>
-              </Space>
-            </Col>
-          </Row>
-          </Card>
+          <Space direction="vertical" size={16} className="w-100">
+            <Card>
+              <Row justify="space-between" align="middle" gutter={[24, 16]}>
+                <Col xs={24} lg={14}>
+                  <Space direction="vertical" size={8}>
+                    <Title level={2} className="mb-0">
+                      AutoMind Prediction
+                    </Title>
+                    <Paragraph className="mb-0" type="secondary">
+                      Real-data prediction report generated from WrenAI
+                      E-commerce sample data.
+                    </Paragraph>
+                    <Space wrap>
+                      <Tag color="blue">AutoMind-service: localhost:8000</Tag>
+                      <Tag color="geekblue">WrenAI E-commerce sample</Tag>
+                    </Space>
+                  </Space>
+                </Col>
+                <Col xs={24} lg={10}>
+                  <Space direction="vertical" size={12} className="w-100">
+                    <ActionBlock
+                      title="Run Prediction from WrenAI Data"
+                      helper="Use real row-level records queried from WrenAI."
+                    >
+                      <Button
+                        type="primary"
+                        block
+                        loading={loadingAction === 'wren'}
+                        disabled={Boolean(loadingAction)}
+                        onClick={() => runPrediction('wren')}
+                      >
+                        Run Prediction from WrenAI Data
+                      </Button>
+                    </ActionBlock>
+                    <ActionBlock
+                      title="Run Demo Prediction"
+                      helper="Use built-in demo records as a fallback."
+                    >
+                      <Button
+                        block
+                        loading={loadingAction === 'demo'}
+                        disabled={Boolean(loadingAction)}
+                        onClick={() => runPrediction('demo')}
+                      >
+                        Run Demo Prediction
+                      </Button>
+                    </ActionBlock>
+                  </Space>
+                </Col>
+              </Row>
+            </Card>
+
+            <Row gutter={[16, 16]}>
+              <Col xs={24} lg={sourceInfo ? 16 : 24}>
+                <Card title="Data Flow" size="small">
+                  <Space wrap size={8}>
+                    <Tag color="processing">WrenAI SQL Query</Tag>
+                    <Text type="secondary">→</Text>
+                    <Tag color="blue">AutoMind-service</Tag>
+                    <Text type="secondary">→</Text>
+                    <Tag color="green">Prediction Report</Tag>
+                  </Space>
+                </Card>
+              </Col>
+              {sourceInfo && (
+                <Col xs={24} lg={8}>
+                  <SourceIndicator sourceInfo={sourceInfo} />
+                </Col>
+              )}
+            </Row>
+          </Space>
 
           {error && (
           <Alert
@@ -149,8 +203,8 @@ export default function AutoMindPredictionPage() {
 
             <Section title="Model Audit">
               <Paragraph type="secondary">
-                {report.model_audit?.note ||
-                  'Metrics are validation metrics and are not production guarantees.'}
+                Metrics are computed on a validation split for demo auditing
+                and are not production guarantees.
               </Paragraph>
               <MetricCards metrics={metrics} />
               <Divider />
@@ -195,6 +249,60 @@ function Section(props: { title: string; children: React.ReactNode }) {
   return (
     <Card title={props.title} size="small">
       {props.children}
+    </Card>
+  );
+}
+
+function ActionBlock({
+  title,
+  helper,
+  children,
+}: {
+  title: string;
+  helper: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        border: '1px solid #f0f0f0',
+        borderRadius: 8,
+        padding: 12,
+        background: '#fafafa',
+      }}
+    >
+      <Space direction="vertical" size={8} className="w-100">
+        <div>
+          <Text strong>{title}</Text>
+          <div>
+            <Text type="secondary">{helper}</Text>
+          </div>
+        </div>
+        {children}
+      </Space>
+    </div>
+  );
+}
+
+function SourceIndicator({ sourceInfo }: { sourceInfo: SourceInfo }) {
+  const isWren = sourceInfo.source === 'wren';
+
+  return (
+    <Card title="Current Mode / Source" size="small">
+      <Space direction="vertical" size={8}>
+        <Tag color={isWren ? 'geekblue' : 'default'}>
+          Source:{' '}
+          {isWren ? 'WrenAI E-commerce sample' : 'Built-in AutoMind demo data'}
+        </Tag>
+        {isWren && (
+          <Text>
+            Records:{' '}
+            {typeof sourceInfo.recordCount === 'number'
+              ? sourceInfo.recordCount
+              : '-'}
+          </Text>
+        )}
+      </Space>
     </Card>
   );
 }
