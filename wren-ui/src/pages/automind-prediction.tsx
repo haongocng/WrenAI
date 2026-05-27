@@ -29,7 +29,7 @@ const { Title, Paragraph, Text } = Typography;
 const { Panel } = Collapse;
 
 export default function AutoMindPredictionPage() {
-  const [loading, setLoading] = useState(false);
+  const [loadingAction, setLoadingAction] = useState<'demo' | 'wren' | null>(null);
   const [error, setError] = useState<string>(null);
   const [response, setResponse] = useState<AutoMindResponse>(null);
 
@@ -38,26 +38,32 @@ export default function AutoMindPredictionPage() {
   const warnings = report?.warnings || response?.warnings || [];
   const limitations = report?.limitations || [];
 
-  const runPrediction = async () => {
-    setLoading(true);
+  const runPrediction = async (source: 'demo' | 'wren') => {
+    setLoadingAction(source);
     setError(null);
     try {
-      const result = await axios.post<AutoMindResponse>(
-        '/api/automind/predict',
-        {},
-      );
+      const endpoint =
+        source === 'wren'
+          ? '/api/automind/predict-from-wren'
+          : '/api/automind/predict';
+      const result = await axios.post<AutoMindResponse>(endpoint, {});
       setResponse(result.data);
     } catch (err) {
-      const message = axios.isAxiosError(err)
+      const detail = axios.isAxiosError(err)
         ? err.response?.data?.detail ||
           err.response?.data?.error ||
           err.message
         : err instanceof Error
           ? err.message
           : 'Unknown request error';
-      setError(String(message));
+      const message = typeof detail === 'string' ? detail : JSON.stringify(detail);
+      setError(
+        source === 'wren'
+          ? `WrenAI data prediction failed: ${message}`
+          : `Demo prediction failed: ${message}`,
+      );
     } finally {
-      setLoading(false);
+      setLoadingAction(null);
     }
   };
 
@@ -80,14 +86,23 @@ export default function AutoMindPredictionPage() {
               </Space>
             </Col>
             <Col>
-              <Button
-                type="primary"
-                loading={loading}
-                disabled={loading}
-                onClick={runPrediction}
-              >
-                Run Prediction
-              </Button>
+              <Space wrap>
+                <Button
+                  loading={loadingAction === 'demo'}
+                  disabled={Boolean(loadingAction)}
+                  onClick={() => runPrediction('demo')}
+                >
+                  Run Demo Prediction
+                </Button>
+                <Button
+                  type="primary"
+                  loading={loadingAction === 'wren'}
+                  disabled={Boolean(loadingAction)}
+                  onClick={() => runPrediction('wren')}
+                >
+                  Run Prediction from WrenAI Data
+                </Button>
+              </Space>
             </Col>
           </Row>
           </Card>
