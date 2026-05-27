@@ -16,6 +16,7 @@ import {
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import MarkdownBlock from '@/components/editor/MarkdownBlock';
+import HeaderBar from '@/components/HeaderBar';
 import AutoMindChart from '@/components/pages/automind/AutoMindChart';
 import {
   AutoMindChartSpec,
@@ -23,7 +24,7 @@ import {
   AutoMindResponse,
 } from '@/components/pages/automind/types';
 
-const { Header, Content } = Layout;
+const { Content } = Layout;
 const { Title, Paragraph, Text } = Typography;
 const { Panel } = Collapse;
 
@@ -62,19 +63,7 @@ export default function AutoMindPredictionPage() {
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
-      <Header
-        style={{
-          height: 56,
-          padding: '0 24px',
-          background: '#111827',
-          display: 'flex',
-          alignItems: 'center',
-        }}
-      >
-        <Text style={{ color: '#fff', fontSize: 16, fontWeight: 600 }}>
-          WrenAI / AutoMind Prediction
-        </Text>
-      </Header>
+      <HeaderBar />
       <Content>
         <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto' }}>
           <Card>

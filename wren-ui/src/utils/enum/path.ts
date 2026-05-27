@@ -3,6 +3,7 @@ export enum Path {
   HomeDashboard = '/home/dashboard',
   Thread = '/home/[id]',
   Modeling = '/modeling',
+  AutoMindPrediction = '/automind-prediction',
   Onboarding = '/setup',
   OnboardingConnection = '/setup/connection',
   OnboardingModels = '/setup/models',

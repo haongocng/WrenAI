@@ -79,6 +79,14 @@ export default function HeaderBar() {
               >
                 API
               </StyledButton>
+              <StyledButton
+                shape="round"
+                size="small"
+                $isHighlight={pathname.startsWith(Path.AutoMindPrediction)}
+                onClick={() => router.push(Path.AutoMindPrediction)}
+              >
+                AutoMind
+              </StyledButton>
             </Space>
           )}
         </Space>
