@@ -18,6 +18,13 @@ export interface AutoMindAgentInsights {
   risk_notes?: string[];
 }
 
+export interface AutoMindAgentTraceItem {
+  agent?: string;
+  status?: string;
+  message?: string;
+  details?: Record<string, unknown>;
+}
+
 export interface AutoMindReport {
   title?: string;
   executive_summary?: string[];
@@ -57,6 +64,7 @@ export interface AutoMindReport {
   warnings?: string[];
   limitations?: string[];
   agent_insights?: AutoMindAgentInsights;
+  agent_workflow?: AutoMindAgentTraceItem[];
   report_markdown?: string;
 }
 
@@ -69,4 +77,5 @@ export interface AutoMindResponse {
   charts?: Record<string, Record<string, any>[]>;
   insight?: string;
   warnings?: string[];
+  agent_trace?: AutoMindAgentTraceItem[];
 }

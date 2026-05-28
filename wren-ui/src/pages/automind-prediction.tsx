@@ -49,6 +49,7 @@ export default function AutoMindPredictionPage() {
   const metrics = report?.model_audit?.metrics || response?.metrics || {};
   const warnings = report?.warnings || response?.warnings || [];
   const limitations = report?.limitations || [];
+  const agentTrace = response?.agent_trace || report?.agent_workflow || [];
 
   const selectDomain = (domain: PredictionDomain) => {
     setSelectedDomain(domain);
@@ -218,6 +219,7 @@ export default function AutoMindPredictionPage() {
                   <SourceIndicator
                     sourceInfo={sourceInfo}
                     agentInsights={report?.agent_insights}
+                    hasAgentWorkflow={agentTrace.length > 0}
                   />
                 </Col>
               )}
@@ -254,6 +256,10 @@ export default function AutoMindPredictionPage() {
 
             <Section title="Agent Insights">
               <AgentInsights insights={report.agent_insights} />
+            </Section>
+
+            <Section title="Agent Workflow">
+              <AgentWorkflow trace={agentTrace} />
             </Section>
 
             <Section title="Prediction Task">
@@ -386,9 +392,11 @@ function ActionBlock({
 function SourceIndicator({
   sourceInfo,
   agentInsights,
+  hasAgentWorkflow,
 }: {
   sourceInfo: SourceInfo;
   agentInsights?: AutoMindReport['agent_insights'];
+  hasAgentWorkflow: boolean;
 }) {
   const isWren = sourceInfo.source === 'wren';
   const isHeart = sourceInfo.source === 'heart';
@@ -408,6 +416,9 @@ function SourceIndicator({
         <Tag color={hasAgentInsights ? 'green' : 'default'}>
           InsightAgent: {hasAgentInsights ? 'LLM enriched' : 'Rule-based'}
         </Tag>
+        <Tag color={hasAgentWorkflow ? 'green' : 'default'}>
+          Agent Workflow: {hasAgentWorkflow ? 'Available' : 'Not available'}
+        </Tag>
         {(isWren || isHeart) && (
           <Text>
             Records:{' '}
@@ -419,6 +430,53 @@ function SourceIndicator({
       </Space>
     </Card>
   );
+}
+
+function AgentWorkflow({
+  trace,
+}: {
+  trace?: AutoMindReport['agent_workflow'];
+}) {
+  if (!trace || trace.length === 0) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        message="Agent workflow trace is not available for this response."
+      />
+    );
+  }
+
+  return (
+    <Row gutter={[16, 16]}>
+      {trace.map((item, index) => (
+        <Col xs={24} md={12} xl={8} key={`${item.agent || 'agent'}-${index}`}>
+          <Card size="small">
+            <Space direction="vertical" size={8} className="w-100">
+              <Space wrap>
+                <Text strong>{item.agent || `Agent ${index + 1}`}</Text>
+                <Tag color={agentStatusColor(item.status)}>
+                  {item.status || 'unknown'}
+                </Tag>
+              </Space>
+              {item.message && (
+                <Text type="secondary">{item.message}</Text>
+              )}
+            </Space>
+          </Card>
+        </Col>
+      ))}
+    </Row>
+  );
+}
+
+function agentStatusColor(status?: string) {
+  const normalized = (status || '').toLowerCase();
+  if (normalized === 'success') return 'green';
+  if (normalized === 'fallback') return 'orange';
+  if (normalized === 'failed' || normalized === 'error') return 'red';
+  if (normalized === 'disabled' || normalized === 'skipped') return 'default';
+  return 'blue';
 }
 
 function AgentInsights({
