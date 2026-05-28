@@ -238,78 +238,19 @@ export default function AutoMindPredictionPage() {
 
           {report && (
           <Space direction="vertical" size={16} className="w-100 mt-4">
-            <Section title="Executive Summary">
-              <BulletList items={report.executive_summary} />
-            </Section>
+            <InsightReport
+              report={report}
+              metrics={metrics}
+              selectedDomain={selectedDomain}
+            />
 
-            <Section title="Dataset Overview">
-              <DatasetOverview report={report} />
-            </Section>
-
-            <Section title="EDA Charts">
-              <ChartGrid charts={report.eda?.charts || []} />
-            </Section>
-
-            <Section title="Key Data Insights">
-              <BulletList items={report.key_insights} />
-            </Section>
-
-            <Section title="Agent Insights">
-              <AgentInsights insights={report.agent_insights} />
-            </Section>
-
-            <Section title="Agent Workflow">
-              <AgentWorkflow trace={agentTrace} />
-            </Section>
-
-            <Section title="Prediction Task">
-              <PredictionTask report={report} />
-            </Section>
-
-            <Section title="Prediction Results">
-              <ChartGrid charts={report.prediction_results?.charts || []} />
-              <Divider />
-              <SamplePredictionsTable
-                rows={report.prediction_results?.sample_predictions || []}
-              />
-            </Section>
-
-            <Section title="Model Audit">
-              <Paragraph type="secondary">
-                Metrics are computed on a validation split for demo auditing
-                and are not production guarantees.
-              </Paragraph>
-              <MetricCards metrics={metrics} />
-              <Divider />
-              <ChartGrid charts={report.model_audit?.charts || []} />
-              <Divider />
-              <ConfusionMatrix matrix={report.model_audit?.confusion_matrix} />
-            </Section>
-
-            <Section title="Recommendations">
-              <BulletList items={report.recommendations} />
-            </Section>
-
-            <Section title="Warnings and Limitations">
-              {warnings.length > 0 && (
-                <Alert
-                  type="warning"
-                  showIcon
-                  message="Warnings"
-                  description={<BulletList items={warnings} />}
-                  className="mb-3"
-                />
-              )}
-              <BulletList items={limitations} />
-            </Section>
-
-            {report.report_markdown && (
-              <Collapse>
-                <Panel header="Full Markdown Report" key="markdown-report">
-                  <MarkdownBlock content={report.report_markdown} />
-                </Panel>
-              </Collapse>
-            )}
+            <DetailedAgentReports
+              report={report}
+              metrics={metrics}
+              warnings={warnings}
+              limitations={limitations}
+              agentTrace={agentTrace}
+            />
           </Space>
         )}
         </div>
@@ -318,12 +259,365 @@ export default function AutoMindPredictionPage() {
   );
 }
 
-function Section(props: { title: string; children: React.ReactNode }) {
+function InsightReport({
+  report,
+  metrics,
+  selectedDomain,
+}: {
+  report: AutoMindReport;
+  metrics?: Record<string, number>;
+  selectedDomain: PredictionDomain;
+}) {
+  const insights = report.agent_insights;
+  const isHeartDisease = selectedDomain === 'heart';
+  const primaryCharts = getPrimaryInsightCharts(report, isHeartDisease);
+  const insightBadge = analystBadge(insights);
+  const insightTitle = isHeartDisease ? 'Key Findings' : 'Business Insights';
+
   return (
-    <Card title={props.title} size="small">
-      {props.children}
-    </Card>
+    <Space direction="vertical" size={16} className="w-100">
+      <div>
+        <Title level={3} className="mb-0">
+          Insight Report
+        </Title>
+        <Text type="secondary">
+          {insightSubtitle(selectedDomain)}
+        </Text>
+      </div>
+
+      {isHeartDisease && (
+        <Alert
+          type="warning"
+          showIcon
+          message="For demonstration and research only; not medical advice, diagnosis, or treatment guidance."
+        />
+      )}
+
+      {primaryCharts.length > 0 && (
+        <Card size="small" title="Visual Evidence">
+          <Row gutter={[20, 20]}>
+            {primaryCharts.map((chart) => (
+              <Col
+                xs={24}
+                xxl={primaryCharts.length > 1 ? 12 : 24}
+                key={chart.id}
+              >
+                <div style={{ overflowX: 'auto' }}>
+                  <AutoMindChart chart={chart} showDataTable={false} />
+                </div>
+              </Col>
+            ))}
+          </Row>
+        </Card>
+      )}
+
+      <Row gutter={[16, 16]} align="top">
+        <Col xs={24}>
+          <Card size="small" title="Summary">
+            <Space direction="vertical" size={12} className="w-100">
+              <Space wrap>
+                <Tag color={insightBadge.color}>{insightBadge.label}</Tag>
+                {insights?.provider && <Tag>Provider: {insights.provider}</Tag>}
+                {insights?.model && <Tag>Model: {insights.model}</Tag>}
+              </Space>
+
+              {insights?.summary ? (
+                <Paragraph className="mb-0">{insights.summary}</Paragraph>
+              ) : (
+                <BulletList items={report.executive_summary} />
+              )}
+
+              <MetricNote report={report} metrics={metrics} />
+            </Space>
+          </Card>
+        </Col>
+
+        <Col xs={24} xl={8}>
+          <Card size="small" title={insightTitle}>
+            <BulletList
+              items={insights?.business_insights || report.key_insights}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} xl={8}>
+          <Card size="small" title="Recommendations">
+            <BulletList
+              items={insights?.recommendations || report.recommendations}
+            />
+          </Card>
+        </Col>
+        <Col xs={24} xl={8}>
+          <Card size="small" title="Risk Notes">
+            <BulletList items={insights?.risk_notes || report.warnings} />
+          </Card>
+        </Col>
+      </Row>
+    </Space>
   );
+}
+
+function DetailedAgentReports({
+  report,
+  metrics,
+  warnings,
+  limitations,
+  agentTrace,
+}: {
+  report: AutoMindReport;
+  metrics?: Record<string, number>;
+  warnings: string[];
+  limitations: string[];
+  agentTrace?: AutoMindReport['agent_workflow'];
+}) {
+  const isHeartDisease = report.target_metadata?.target_column === 'HeartDisease';
+  const insightChartKeys = new Set(
+    getPrimaryInsightCharts(report, isHeartDisease).map(chartKey),
+  );
+
+  return (
+    <Space direction="vertical" size={12} className="w-100">
+      <div>
+        <Title level={4} className="mb-0">
+          Detailed Agent Reports
+        </Title>
+        <Text type="secondary">
+          Dataset, modeling, workflow, and full technical report details.
+        </Text>
+      </div>
+
+      <Collapse defaultActiveKey={['dataset-overview', 'model-audit']}>
+        <Panel header="Dataset Overview" key="dataset-overview">
+          <DatasetOverview report={report} />
+          {report.eda?.summary?.length > 0 && (
+            <>
+              <Divider />
+              <Text strong>EDA Summary</Text>
+              <BulletList items={report.eda.summary} />
+            </>
+          )}
+          {report.key_insights?.length > 0 && (
+            <>
+              <Divider />
+              <Text strong>Key Data Insights</Text>
+              <BulletList items={report.key_insights} />
+            </>
+          )}
+        </Panel>
+
+        <Panel header="EDA Charts" key="eda-charts">
+          <ChartGrid
+            charts={dedupeCharts(report.eda?.charts || [], insightChartKeys)}
+          />
+        </Panel>
+
+        <Panel header="Prediction Task" key="prediction-task">
+          <PredictionTask report={report} />
+        </Panel>
+
+        <Panel header="Prediction Results" key="prediction-results">
+          <ChartGrid
+            charts={dedupeCharts(
+              report.prediction_results?.charts || [],
+              insightChartKeys,
+            )}
+          />
+          <Divider />
+          <SamplePredictionsTable
+            rows={report.prediction_results?.sample_predictions || []}
+          />
+        </Panel>
+
+        <Panel header="Model Audit" key="model-audit">
+          <Paragraph type="secondary">
+            Metrics are computed on a validation split for demo auditing and are
+            not production guarantees.
+          </Paragraph>
+          <MetricCards metrics={metrics} />
+          <Divider />
+          <ChartGrid
+            charts={dedupeCharts(report.model_audit?.charts || [])}
+            emptyMessage="Model audit charts are not available for this response."
+            compactEmpty
+          />
+          <Divider />
+          <ConfusionMatrix matrix={report.model_audit?.confusion_matrix} />
+        </Panel>
+
+        <Panel header="Agent Insights" key="agent-insights">
+          <AgentInsights
+            insights={report.agent_insights}
+            isHeartDisease={report.target_metadata?.target_column === 'HeartDisease'}
+          />
+        </Panel>
+
+        <Panel header="Agent Execution Trace" key="agent-execution-trace">
+          <AgentWorkflow trace={agentTrace} />
+        </Panel>
+
+        <Panel header="Recommendations" key="recommendations">
+          <BulletList items={report.recommendations} />
+        </Panel>
+
+        <Panel header="Warnings and Limitations" key="warnings-limitations">
+          {warnings.length > 0 && (
+            <Alert
+              type="warning"
+              showIcon
+              message="Warnings"
+              description={<BulletList items={warnings} />}
+              className="mb-3"
+            />
+          )}
+          <BulletList items={limitations} />
+        </Panel>
+
+        {report.report_markdown && (
+          <Panel header="Full Markdown Report" key="markdown-report">
+            <MarkdownBlock content={report.report_markdown} />
+          </Panel>
+        )}
+      </Collapse>
+    </Space>
+  );
+}
+
+function MetricNote({
+  report,
+  metrics,
+}: {
+  report: AutoMindReport;
+  metrics?: Record<string, number>;
+}) {
+  const selectedMetrics = ['accuracy', 'precision', 'recall', 'f1']
+    .map((key) => ({ key, value: metrics?.[key] }))
+    .filter((item) => typeof item.value === 'number');
+
+  if (!selectedMetrics.length && !report.model_audit?.note) return null;
+
+  return (
+    <Alert
+      type="info"
+      showIcon
+      message="Model audit note"
+      description={
+        <Space direction="vertical" size={4}>
+          {report.model_audit?.note && <Text>{report.model_audit.note}</Text>}
+          {selectedMetrics.length > 0 && (
+            <Space wrap>
+              {selectedMetrics.map((item) => (
+                <Tag key={item.key}>
+                  {item.key}: {Number(item.value).toFixed(3)}
+                </Tag>
+              ))}
+            </Space>
+          )}
+        </Space>
+      }
+    />
+  );
+}
+
+function getPrimaryInsightCharts(
+  report: AutoMindReport,
+  isHeartDisease: boolean,
+): AutoMindChartSpec[] {
+  const charts = [
+    ...(report.eda?.charts || []),
+    ...(report.prediction_results?.charts || []),
+  ].filter((chart) => isUsefulInsightChart(chart, isHeartDisease));
+
+  const sorted = [...charts].sort((left, right) => {
+    const priorityDelta = chartPriority(right, isHeartDisease) - chartPriority(left, isHeartDisease);
+    if (priorityDelta !== 0) return priorityDelta;
+    return chartTitle(left).localeCompare(chartTitle(right));
+  });
+
+  if (isHeartDisease) {
+    const preferred = sorted.filter(
+      (chart) =>
+        chart.id !== 'prediction_distribution' &&
+        chart.id !== 'heart_confusion_matrix' &&
+        chart.kind !== 'confusion_matrix' &&
+        !chartTitle(chart).toLowerCase().includes('missing'),
+    );
+    return (preferred.length ? preferred : sorted).slice(0, 2);
+  }
+
+  return sorted.slice(0, 2);
+}
+
+function isUsefulInsightChart(
+  chart: AutoMindChartSpec,
+  isHeartDisease: boolean,
+) {
+  if (!chart?.data?.length || !chart.title) return false;
+  const title = chartTitle(chart).toLowerCase();
+  if (title.includes('missing') && chart.data.length === 0) return false;
+  if (isHeartDisease && /good review|bad review|good vs bad/i.test(title)) {
+    return false;
+  }
+  return true;
+}
+
+function chartPriority(chart: AutoMindChartSpec, isHeartDisease = false) {
+  const text = chartTitle(chart).toLowerCase();
+  if (isHeartDisease) {
+    if (text.includes('feature_importance') || text.includes('feature importance ranking')) return 100;
+    if (text.includes('correlation')) return 90;
+    if (text.includes('st_slope')) return 80;
+    if (text.includes('heart disease distribution')) return 50;
+    if (text.includes('confusion')) return 30;
+    if (text.includes('prediction_distribution') || text.includes('prediction distribution')) return 20;
+  }
+
+  if (typeof chart.priority === 'number') return chart.priority;
+
+
+  if (text.includes('class') || text.includes('target') || text.includes('distribution')) {
+    return 4;
+  }
+  if (text.includes('prediction')) return 3;
+  if (text.includes('missing')) return 2;
+  return 1;
+}
+
+function dedupeCharts(
+  charts: AutoMindChartSpec[],
+  excludedKeys: Set<string> = new Set(),
+) {
+  const seen = new Set<string>();
+  return charts.filter((chart) => {
+    const key = chartKey(chart);
+    if (excludedKeys.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function chartKey(chart: AutoMindChartSpec) {
+  return chart.id || chart.title || '';
+}
+
+function chartTitle(chart: AutoMindChartSpec) {
+  return `${chart.id || ''} ${chart.title || ''} ${chart.kind || ''}`;
+}
+
+function insightSubtitle(domain: PredictionDomain) {
+  if (domain === 'ecommerce') {
+    return 'Analyst summary of review prediction results.';
+  }
+  if (domain === 'heart') {
+    return 'Analyst summary of heart disease classification results.';
+  }
+  return 'Analyst summary of the AutoMind prediction result.';
+}
+
+function analystBadge(insights?: AutoMindReport['agent_insights']) {
+  const provider = (insights?.provider || '').toLowerCase();
+  if (insights?.enabled === true && provider === 'deepinfra') {
+    return { label: 'LLM Analyst', color: 'green' };
+  }
+  return { label: 'Rule-based Analyst', color: 'default' };
 }
 
 function DomainSelector({
@@ -400,7 +694,7 @@ function SourceIndicator({
 }) {
   const isWren = sourceInfo.source === 'wren';
   const isHeart = sourceInfo.source === 'heart';
-  const hasAgentInsights = Boolean(agentInsights);
+  const insightBadge = analystBadge(agentInsights);
   const sourceLabel = isHeart
     ? 'Prepared Heart Disease CSV dataset'
     : isWren
@@ -413,11 +707,11 @@ function SourceIndicator({
         <Tag color={isHeart ? 'volcano' : isWren ? 'geekblue' : 'default'}>
           Source: {sourceLabel}
         </Tag>
-        <Tag color={hasAgentInsights ? 'green' : 'default'}>
-          InsightAgent: {hasAgentInsights ? 'LLM enriched' : 'Rule-based'}
+        <Tag color={insightBadge.color}>
+          InsightAgent: {insightBadge.label}
         </Tag>
         <Tag color={hasAgentWorkflow ? 'green' : 'default'}>
-          Agent Workflow: {hasAgentWorkflow ? 'Available' : 'Not available'}
+          Agent Execution Trace: {hasAgentWorkflow ? 'Available' : 'Not available'}
         </Tag>
         {(isWren || isHeart) && (
           <Text>
@@ -442,7 +736,7 @@ function AgentWorkflow({
       <Alert
         type="info"
         showIcon
-        message="Agent workflow trace is not available for this response."
+        message="Agent execution trace is not available for this response."
       />
     );
   }
@@ -481,8 +775,10 @@ function agentStatusColor(status?: string) {
 
 function AgentInsights({
   insights,
+  isHeartDisease = false,
 }: {
   insights?: AutoMindReport['agent_insights'];
+  isHeartDisease?: boolean;
 }) {
   if (!insights) {
     return (
@@ -497,7 +793,7 @@ function AgentInsights({
   return (
     <Space direction="vertical" size={16} className="w-100">
       <Space wrap>
-        <Tag color="green">LLM enriched</Tag>
+        <Tag color={analystBadge(insights).color}>{analystBadge(insights).label}</Tag>
         {insights.provider && <Tag>Provider: {insights.provider}</Tag>}
         {insights.model && <Tag>Model: {insights.model}</Tag>}
       </Space>
@@ -512,7 +808,7 @@ function AgentInsights({
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={8}>
           <InsightList
-            title="Business Insights"
+            title={isHeartDisease ? 'Key Findings' : 'Business Insights'}
             items={insights.business_insights}
           />
         </Col>
@@ -619,14 +915,27 @@ function PredictionTask({ report }: { report: AutoMindReport }) {
   );
 }
 
-function ChartGrid({ charts }: { charts: AutoMindChartSpec[] }) {
-  if (!charts.length) {
-    return <Alert type="info" showIcon message="No charts available" />;
+function ChartGrid({
+  charts,
+  emptyMessage = 'No charts available',
+  compactEmpty = false,
+}: {
+  charts: AutoMindChartSpec[];
+  emptyMessage?: string;
+  compactEmpty?: boolean;
+}) {
+  const uniqueCharts = dedupeCharts(charts);
+
+  if (!uniqueCharts.length) {
+    if (compactEmpty) {
+      return <Text type="secondary">{emptyMessage}</Text>;
+    }
+    return <Alert type="info" showIcon message={emptyMessage} />;
   }
 
   return (
     <Row gutter={[16, 16]}>
-      {charts.map((chart) => (
+      {uniqueCharts.map((chart) => (
         <Col xs={24} xl={12} key={chart.id}>
           <AutoMindChart chart={chart} />
         </Col>

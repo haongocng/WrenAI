@@ -1,11 +1,21 @@
 export interface AutoMindChartSpec {
   id: string;
   title: string;
-  type?: 'bar' | 'line' | 'donut' | 'pie' | string;
+  type?: 'bar' | 'line' | 'donut' | 'pie' | 'heatmap' | 'grouped_bar' | string;
+  kind?: string;
+  priority?: number;
   description?: string;
   data?: Record<string, any>[];
   x?: string;
   y?: string;
+  color?: string;
+  analysis?: {
+    headline?: string;
+    what_it_shows?: string;
+    key_observations?: string[];
+    interpretation?: string;
+    caveat?: string;
+  };
 }
 
 export interface AutoMindAgentInsights {
@@ -63,6 +73,15 @@ export interface AutoMindReport {
   recommendations?: string[];
   warnings?: string[];
   limitations?: string[];
+  target_metadata?: {
+    domain_name?: string;
+    target_column?: string;
+    positive_label?: string;
+    negative_label?: string;
+    distribution_title?: string;
+    target_description?: string;
+    task_type?: string;
+  };
   agent_insights?: AutoMindAgentInsights;
   agent_workflow?: AutoMindAgentTraceItem[];
   report_markdown?: string;
